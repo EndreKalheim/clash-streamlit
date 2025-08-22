@@ -27,6 +27,8 @@ SUFFIXES = [
     "King", "Spy", "Clash", "Noble", "Crystal", "Quartz", "Steel", "Mercury", "Copper", "Bronze", "Platinum"
 ]
 
+headers = {"Authorization": f"Bearer {API_KEY}"}
+
 class ClashAPI:
     """Centralized API client for Clash of Clans"""
     
@@ -67,44 +69,27 @@ api_client = ClashAPI()
 
 def get_clan(clan_tag):
     """Get information about a specific clan"""
-    url = f"{BASE_URL}/clans/{clan_tag.replace('#', '%23')}"
-    response = requests.get(url, headers=headers)
-    return response.json()
+    return api_client.make_request(f"clans/{clan_tag.replace('#', '%23')}")
 
 def get_player(player_tag):
     """Get information about a specific player"""
-    url = f"{BASE_URL}/players/{player_tag.replace('#', '%23')}"
-    response = requests.get(url, headers=headers)
-    return response.json()
+    return api_client.make_request(f"players/{player_tag.replace('#', '%23')}")
 
 def search_clans(params):
     """Search for clans with the given parameters"""
-    url = f"{BASE_URL}/clans"
-    response = requests.get(url, headers=headers, params=params)
-    return response.json()
+    return api_client.make_request("clans", params)
 
 # Add more detailed error handling for debugging
 def search_clans_with_retry(params, max_retries=3):
     """Search for clans with retry logic and better error reporting"""
-    url = f"{BASE_URL}/clans"
     for attempt in range(max_retries):
-        try:
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()  # Raise exception for HTTP errors
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            if attempt < max_retries - 1:
-                time.sleep(1)  # Wait before retrying
-                continue
-            else:
-                # Return error details instead of raising exception
-                return {
-                    "error": True,
-                    "message": str(e),
-                    "url": url,
-                    "params": params,
-                    "status_code": response.status_code if hasattr(response, 'status_code') else None
-                }
+        result = api_client.make_request("clans", params)
+        if not result.get("error"):
+            return result
+        elif attempt < max_retries - 1:
+            time.sleep(1)  # Wait before retrying
+            continue
+    return result  # Return the last error result
 
 def get_headers(api_key=API_KEY):
     """Create headers with the provided API key."""
@@ -177,7 +162,7 @@ get_player_details = get_player_info
 def get_clans_by_name_deduplicated(name, seen_tags, api_key=API_KEY, min_members=10, max_members=200):
     """Search for clans by name, avoiding duplicates."""
     headers = get_headers(api_key)
-    url = "https://cocproxy.royaleapi.dev/v1/clans"
+    url = f"{BASE_URL}/clans"  # Use BASE_URL instead of hardcoding
     params = {"name": name, "minMembers": min_members, "maxMembers": max_members, "limit": 200}
     
     try:
