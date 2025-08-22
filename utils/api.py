@@ -4,6 +4,7 @@ import time
 from itertools import product
 import json
 from parameters import API_KEY, THREADS, BASE_URL  # Import BASE_URL instead of hardcoding URLs
+import streamlit as st  # Add this import at the top
 
 session = requests.Session()
 
@@ -26,7 +27,43 @@ SUFFIXES = [
     "King", "Spy", "Clash", "Noble", "Crystal", "Quartz", "Steel", "Mercury", "Copper", "Bronze", "Platinum"
 ]
 
-headers = {"Authorization": f"Bearer {API_KEY}"}
+class ClashAPI:
+    """Centralized API client for Clash of Clans"""
+    
+    def __init__(self):
+        self.headers = {"Authorization": f"Bearer {API_KEY}"}
+        self.base_url = BASE_URL
+
+    def make_request(self, endpoint, params=None):
+        """Make a request to the Clash API with proper error handling"""
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            # Log the request for debugging
+            if hasattr(st, 'session_state') and "api_calls" in st.session_state:
+                st.session_state.api_calls.append({
+                    "url": url,
+                    "status_code": response.status_code,
+                    "success": response.status_code == 200,
+                    "response": response.text[:100] + "..." if len(response.text) > 100 else response.text
+                })
+            
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            if hasattr(st, 'session_state') and "api_calls" in st.session_state:
+                st.session_state.api_calls.append({
+                    "url": url,
+                    "status_code": "Error",
+                    "success": False,
+                    "response": str(e)
+                })
+            # Return error object instead of raising
+            return {"error": True, "message": str(e), "url": url}
+
+# Create an instance to use throughout the app
+api_client = ClashAPI()
 
 def get_clan(clan_tag):
     """Get information about a specific clan"""
