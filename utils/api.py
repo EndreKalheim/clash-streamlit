@@ -3,7 +3,7 @@ import concurrent.futures
 import time
 from itertools import product
 import json
-from parameters import API_KEY, THREADS, BASE_URL
+from parameters import API_KEY, THREADS, BASE_URL  # Import BASE_URL instead of hardcoding URLs
 
 session = requests.Session()
 
@@ -25,6 +25,49 @@ SUFFIXES = [
     "Fury", "Riders", "Rangers", "Slayers", "Crusaders", "Vikings", "Marauders", "Assassins", "Soldiers", "Brothers",
     "King", "Spy", "Clash", "Noble", "Crystal", "Quartz", "Steel", "Mercury", "Copper", "Bronze", "Platinum"
 ]
+
+headers = {"Authorization": f"Bearer {API_KEY}"}
+
+def get_clan(clan_tag):
+    """Get information about a specific clan"""
+    url = f"{BASE_URL}/clans/{clan_tag.replace('#', '%23')}"
+    response = requests.get(url, headers=headers)
+    return response.json()
+
+def get_player(player_tag):
+    """Get information about a specific player"""
+    url = f"{BASE_URL}/players/{player_tag.replace('#', '%23')}"
+    response = requests.get(url, headers=headers)
+    return response.json()
+
+def search_clans(params):
+    """Search for clans with the given parameters"""
+    url = f"{BASE_URL}/clans"
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
+
+# Add more detailed error handling for debugging
+def search_clans_with_retry(params, max_retries=3):
+    """Search for clans with retry logic and better error reporting"""
+    url = f"{BASE_URL}/clans"
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()  # Raise exception for HTTP errors
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                time.sleep(1)  # Wait before retrying
+                continue
+            else:
+                # Return error details instead of raising exception
+                return {
+                    "error": True,
+                    "message": str(e),
+                    "url": url,
+                    "params": params,
+                    "status_code": response.status_code if hasattr(response, 'status_code') else None
+                }
 
 def get_headers(api_key=API_KEY):
     """Create headers with the provided API key."""

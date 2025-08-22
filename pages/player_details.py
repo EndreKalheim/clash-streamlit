@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.api import get_player_info
 import parameters
+from parameters import BASE_URL
 
 def run():
     st.title("Player Details")
