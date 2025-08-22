@@ -3,7 +3,7 @@ import concurrent.futures
 import time
 from itertools import product
 import json
-from parameters import API_KEY, THREADS
+from parameters import API_KEY, THREADS, BASE_URL
 
 session = requests.Session()
 
@@ -44,7 +44,7 @@ def generate_optimized_search_terms(prefixes=None, suffixes=None):
 def get_clan_members(clan_tag, api_key=API_KEY):
     """Get members of a clan by clan tag."""
     headers = get_headers(api_key)
-    url = f"https://cocproxy.royaleapi.dev/v1/clans/{clan_tag.replace('#', '%23')}"
+    url = f"{BASE_URL}/clans/{clan_tag.replace('#', '%23')}"
     
     max_retries = 3
     retry_count = 0
@@ -69,7 +69,7 @@ def get_clan_members(clan_tag, api_key=API_KEY):
 def get_player_info(player_tag, api_key=API_KEY):
     """Get detailed information about a player."""
     headers = get_headers(api_key)
-    url = f"https://cocproxy.royaleapi.dev/v1/players/{player_tag.replace('#', '%23')}"
+    url = f"{BASE_URL}/players/{player_tag.replace('#', '%23')}"
     
     max_retries = 3
     retry_count = 0
