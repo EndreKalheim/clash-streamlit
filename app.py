@@ -2,6 +2,8 @@ import streamlit as st
 from pages import search, player_details
 from parameters import check_api_connection, API_KEY, BASE_URL
 import requests
+import json
+import traceback
 
 st.set_page_config(
     page_title="Clash of Clans Player Finder",
@@ -10,18 +12,54 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Global variable to store API call logs
+if "api_calls" not in st.session_state:
+    st.session_state.api_calls = []
+
+# Override requests.get to log all API calls
+original_get = requests.get
+def logging_get(*args, **kwargs):
+    try:
+        url = args[0] if args else kwargs.get('url', 'Unknown URL')
+        st.session_state.api_calls.append({"url": url, "status": "Attempting..."})
+        index = len(st.session_state.api_calls) - 1
+        
+        response = original_get(*args, **kwargs)
+        
+        call_info = {
+            "url": url,
+            "status_code": response.status_code,
+            "success": response.status_code == 200,
+            "response": response.text[:100] + "..." if len(response.text) > 100 else response.text
+        }
+        st.session_state.api_calls[index] = call_info
+        return response
+    except Exception as e:
+        error_info = {
+            "url": url,
+            "status_code": "Error",
+            "success": False,
+            "response": str(e),
+            "traceback": traceback.format_exc()
+        }
+        st.session_state.api_calls[index] = error_info
+        raise e
+
+# Replace requests.get with our logging version
+requests.get = logging_get
+
 # Debug mode toggle in sidebar
 with st.sidebar:
     debug_mode = st.checkbox("Show API Diagnostics", value=True)
 
 if debug_mode:
     st.subheader("API Connection Diagnostics")
-    col1, col2 = st.columns(2)
     
+    # Basic configuration info
+    col1, col2 = st.columns(2)
     with col1:
         st.write("API Configuration:")
         st.code(f"Base URL: {BASE_URL}")
-        # Only show first/last 5 chars of API key for security
         masked_key = f"{API_KEY[:5]}...{API_KEY[-5:]}" if len(API_KEY) > 10 else "Not set"
         st.code(f"API Key: {masked_key}")
     
@@ -41,13 +79,31 @@ if debug_mode:
         if st.button("Test Direct API"):
             headers = {"Authorization": f"Bearer {API_KEY}"}
             try:
-                response = requests.get("https://api.clashofclans.com/v1/locations", headers=headers)
+                response = original_get("https://api.clashofclans.com/v1/locations", headers=headers)
                 if response.status_code == 200:
                     st.success(f"✅ Direct API: Connection successful")
                 else:
                     st.error(f"❌ Direct API: Error {response.status_code} - {response.text}")
             except Exception as e:
                 st.error(f"❌ Direct API: {str(e)}")
+
+    # Add a detailed API call log
+    st.subheader("API Call Log")
+    if st.button("Clear Log"):
+        st.session_state.api_calls = []
+    
+    if not st.session_state.api_calls:
+        st.info("No API calls logged yet. Use the app to generate calls.")
+    else:
+        for i, call in enumerate(st.session_state.api_calls):
+            with st.expander(f"Call #{i+1}: {call['url']} - {'✅' if call.get('success', False) else '❌'}"):
+                st.write(f"**URL**: {call['url']}")
+                st.write(f"**Status**: {call.get('status_code', 'Unknown')}")
+                st.text("Response Preview:")
+                st.code(call.get('response', 'No response'))
+                if call.get('traceback'):
+                    st.text("Error Traceback:")
+                    st.code(call['traceback'])
     
     st.markdown("---")
 
