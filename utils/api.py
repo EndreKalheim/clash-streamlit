@@ -44,7 +44,7 @@ def generate_optimized_search_terms(prefixes=None, suffixes=None):
 def get_clan_members(clan_tag, api_key=API_KEY):
     """Get members of a clan by clan tag."""
     headers = get_headers(api_key)
-    url = f"https://api.clashofclans.com/v1/clans/{clan_tag.replace('#', '%23')}"
+    url = f"https://cocproxy.royaleapi.dev/v1/clans/{clan_tag.replace('#', '%23')}"
     
     max_retries = 3
     retry_count = 0
@@ -69,7 +69,7 @@ def get_clan_members(clan_tag, api_key=API_KEY):
 def get_player_info(player_tag, api_key=API_KEY):
     """Get detailed information about a player."""
     headers = get_headers(api_key)
-    url = f"https://api.clashofclans.com/v1/players/{player_tag.replace('#', '%23')}"
+    url = f"https://cocproxy.royaleapi.dev/v1/players/{player_tag.replace('#', '%23')}"
     
     max_retries = 3
     retry_count = 0
@@ -97,7 +97,7 @@ get_player_details = get_player_info
 def get_clans_by_name_deduplicated(name, seen_tags, api_key=API_KEY, min_members=10, max_members=200):
     """Search for clans by name, avoiding duplicates."""
     headers = get_headers(api_key)
-    url = "https://api.clashofclans.com/v1/clans"
+    url = "https://cocproxy.royaleapi.dev/v1/clans"
     params = {"name": name, "minMembers": min_members, "maxMembers": max_members, "limit": 200}
     
     try:

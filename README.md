@@ -38,6 +38,27 @@ streamlit run app.py
 
 Once the application is running, you can navigate between the search and player details pages to find clans and view player statistics.
 
+## Deployment to Streamlit Cloud
+
+This application is configured to work with Streamlit Cloud and uses the RoyaleAPI proxy to ensure API calls work from any IP address.
+
+### Deploying to Streamlit Cloud
+
+1. Fork this repository to your GitHub account
+2. Go to [Streamlit Cloud](https://streamlit.io/cloud)
+3. Create a new app by connecting to your GitHub repository
+4. Configure the following secrets in the Streamlit Cloud dashboard:
+   - `API_KEY` - Your Clash of Clans API key
+
+### Whitelist the RoyaleAPI Proxy IP
+
+For the application to work properly, you need to whitelist the RoyaleAPI proxy IP in your Clash of Clans developer account:
+
+1. Go to the [Clash of Clans developer portal](https://developer.clashofclans.com/)
+2. Navigate to "My Account" → "API Keys"
+3. Edit your API key
+4. Add this IP to the whitelist: `45.79.218.79`
+
 ## Configuration
 Adjust the user-selectable variables in `parameters.py` to customize the application settings, such as API keys and thread counts.
 
