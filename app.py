@@ -4,6 +4,7 @@ from parameters import check_api_connection, API_KEY, BASE_URL
 import requests
 import json
 import traceback
+from utils.api import test_api_connectivity  # Add this import
 
 st.set_page_config(
     page_title="Clash of Clans Player Finder",
