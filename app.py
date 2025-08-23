@@ -48,66 +48,7 @@ def logging_get(*args, **kwargs):
 # Replace requests.get with our logging version
 requests.get = logging_get
 
-# Debug mode toggle in sidebar
-with st.sidebar:
-    debug_mode = st.checkbox("Show API Diagnostics", value=True)
-
-if debug_mode:
-    st.subheader("API Connection Diagnostics")
-    
-    # Basic configuration info
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("API Configuration:")
-        st.code(f"Base URL: {BASE_URL}")
-        masked_key = f"{API_KEY[:5]}...{API_KEY[-5:]}" if len(API_KEY) > 10 else "Not set"
-        st.code(f"API Key: {masked_key}")
-    
-    with col2:
-        # Test direct API and proxy API
-        st.write("Connection Tests:")
-        
-        # Test RoyaleAPI proxy
-        if st.button("Test RoyaleAPI Proxy"):
-            api_working, api_message = check_api_connection()
-            if api_working:
-                st.success(f"✅ RoyaleAPI Proxy: {api_message}")
-            else:
-                st.error(f"❌ RoyaleAPI Proxy: {api_message}")
-        
-        # Test direct API too
-        if st.button("Test Direct API"):
-            headers = {"Authorization": f"Bearer {API_KEY}"}
-            try:
-                response = original_get("https://api.clashofclans.com/v1/locations", headers=headers)
-                if response.status_code == 200:
-                    st.success(f"✅ Direct API: Connection successful")
-                else:
-                    st.error(f"❌ Direct API: Error {response.status_code} - {response.text}")
-            except Exception as e:
-                st.error(f"❌ Direct API: {str(e)}")
-
-    # Add a detailed API call log
-    st.subheader("API Call Log")
-    if st.button("Clear Log"):
-        st.session_state.api_calls = []
-    
-    if not st.session_state.api_calls:
-        st.info("No API calls logged yet. Use the app to generate calls.")
-    else:
-        for i, call in enumerate(st.session_state.api_calls):
-            with st.expander(f"Call #{i+1}: {call['url']} - {'✅' if call.get('success', False) else '❌'}"):
-                st.write(f"**URL**: {call['url']}")
-                st.write(f"**Status**: {call.get('status_code', 'Unknown')}")
-                st.text("Response Preview:")
-                st.code(call.get('response', 'No response'))
-                if call.get('traceback'):
-                    st.text("Error Traceback:")
-                    st.code(call['traceback'])
-    
-    st.markdown("---")
-
-# Check API connection and display status
+# Check API connection silently (no UI feedback unless there's an error)
 api_working, api_message = check_api_connection()
 if not api_working:
     st.error(f"API Connection Error: {api_message}")
