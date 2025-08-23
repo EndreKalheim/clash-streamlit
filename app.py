@@ -87,6 +87,28 @@ if debug_mode:
             except Exception as e:
                 st.error(f"❌ Direct API: {str(e)}")
 
+        if st.button("Run Comprehensive API Test"):
+            with st.spinner("Testing API connectivity..."):
+                test_results = test_api_connectivity()
+                
+                if test_results["success"]:
+                    st.success("✅ API Connectivity Test Passed! All systems operational.")
+                else:
+                    st.error("❌ API Connectivity Issues Detected")
+                
+                # Display test results
+                st.subheader("Test Results")
+                for test_name, result in test_results["tests"].items():
+                    if result["success"]:
+                        st.success(f"✅ {test_name}: {result['message']}")
+                    else:
+                        st.error(f"❌ {test_name}: {result['message']}")
+                
+                # Display recommendations
+                if test_results["recommendations"]:
+                    st.subheader("Recommendations")
+                    for i, rec in enumerate(test_results["recommendations"]):
+                        st.info(f"{i+1}. {rec}")
     # Add a detailed API call log
     st.subheader("API Call Log")
     if st.button("Clear Log"):

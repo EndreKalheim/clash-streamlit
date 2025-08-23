@@ -388,3 +388,115 @@ def find_active_players(clans, api_key=API_KEY, threads=THREADS, min_townhall=16
                     all_active_players.append(player_info)
 
     return all_active_players
+
+def test_api_connectivity(show_detailed=False):
+    """
+    Comprehensive API connectivity test that checks multiple aspects
+    of the API connection and returns detailed diagnostics.
+    
+    Args:
+        show_detailed: If True, includes potentially sensitive information in results
+        
+    Returns:
+        dict: Results of various connectivity tests
+    """
+    results = {
+        "success": False,
+        "tests": {},
+        "recommendations": []
+    }
+    
+    # Test 1: Basic API key format check
+    api_key = API_KEY
+    if not api_key or len(api_key) < 20:  # Arbitrary minimum length
+        results["tests"]["api_key_format"] = {
+            "success": False,
+            "message": "API key appears to be missing or invalid"
+        }
+        results["recommendations"].append(
+            "Check that API_KEY is properly set in .streamlit/secrets.toml for local development "
+            "or in Streamlit Cloud secrets for deployment"
+        )
+    else:
+        results["tests"]["api_key_format"] = {
+            "success": True,
+            "message": "API key format appears valid"
+        }
+    
+    # Test 2: Test RoyaleAPI proxy
+    proxy_url = f"{BASE_URL}/locations"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    
+    try:
+        response = requests.get(proxy_url, headers=headers, timeout=10)
+        results["tests"]["royaleapi_proxy"] = {
+            "success": response.status_code == 200,
+            "status_code": response.status_code,
+            "message": "Connection successful" if response.status_code == 200 else response.text[:200]
+        }
+        
+        if response.status_code != 200:
+            results["recommendations"].append(
+                f"RoyaleAPI proxy returned status {response.status_code}. "
+                "Ensure the RoyaleAPI proxy IP (45.79.218.79) is whitelisted in your Clash API key settings."
+            )
+    except Exception as e:
+        results["tests"]["royaleapi_proxy"] = {
+            "success": False,
+            "message": f"Error connecting to RoyaleAPI proxy: {str(e)}"
+        }
+        results["recommendations"].append(
+            "Network error connecting to RoyaleAPI proxy. Check your internet connection "
+            "and ensure that outbound connections to cocproxy.royaleapi.dev are allowed."
+        )
+    
+    # Test 3: Direct API connection (as a fallback/comparison)
+    direct_url = "https://api.clashofclans.com/v1/locations"
+    
+    try:
+        response = requests.get(direct_url, headers=headers, timeout=10)
+        results["tests"]["direct_api"] = {
+            "success": response.status_code == 200,
+            "status_code": response.status_code,
+            "message": "Connection successful" if response.status_code == 200 else response.text[:200]
+        }
+        
+        if response.status_code == 403 and "accessDenied" in response.text.lower():
+            results["recommendations"].append(
+                "Direct API access denied. This is expected if your current IP is not whitelisted. "
+                "This is why we use the RoyaleAPI proxy, but you can also add your current IP to the whitelist."
+            )
+    except Exception as e:
+        results["tests"]["direct_api"] = {
+            "success": False,
+            "message": f"Error connecting to direct API: {str(e)}"
+        }
+    
+    # Test 4: Test a clan search to verify full API functionality
+    try:
+        clan_search_url = f"{BASE_URL}/clans?name=Clash&limit=1"
+        response = requests.get(clan_search_url, headers=headers, timeout=10)
+        
+        results["tests"]["clan_search"] = {
+            "success": response.status_code == 200,
+            "status_code": response.status_code,
+            "message": "Clan search successful" if response.status_code == 200 else response.text[:200]
+        }
+        
+        if response.status_code == 200:
+            # If we got here, the API is working correctly
+            results["success"] = True
+    except Exception as e:
+        results["tests"]["clan_search"] = {
+            "success": False,
+            "message": f"Error performing clan search: {str(e)}"
+        }
+    
+    # Add deployment-specific recommendations
+    if not any(test["success"] for test in results["tests"].values()):
+        results["recommendations"].append(
+            "If deployed on Streamlit Cloud, make sure you've added your API key to the Streamlit secrets. "
+            "Go to your app dashboard, click on 'Settings' → 'Secrets' and add API_KEY with your key."
+        )
+    
+    return results
