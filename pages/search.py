@@ -14,265 +14,196 @@ from utils.api import search_players_optimized
 import parameters
 
 def run():
-    # Initialize session state for storing seen clan tags and found players
-    if "seen_clan_tags" not in st.session_state:
-        st.session_state.seen_clan_tags = set()
-    
-    if "found_players" not in st.session_state:
-        st.session_state.found_players = []
-    
-    if "search_filters" not in st.session_state:
-        st.session_state.search_filters = {}
+    """Run the Search Players page."""
+    st.title("Search for Active Players")
+
+    with st.form("search_parameters"):
+        st.subheader("Search Parameters")
         
-    if "clans_searched" not in st.session_state:
-        st.session_state.clans_searched = 0
-    
-    st.title("Clash of Clans Player Finder")
-    st.subheader("Find active players based on customizable criteria")
-    
-    # Using tabs for better organization
-    filter_tab, about_tab = st.tabs(["Search Filters", "About"])
-    
-    with filter_tab:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("Clan Search Parameters")
-            min_members = st.number_input("Minimum Clan Members", min_value=1, max_value=50, value=parameters.MIN_MEMBERS)
-            max_members = st.number_input("Maximum Clan Members", min_value=10, max_value=200, value=parameters.MAX_MEMBERS)
-            language_filter = st.text_input("Language Filter (e.g., 'en' for English)", value=parameters.LANGUAGE_FILTER)
-            league_filter = st.text_input("League Filter (e.g., 'Crystal')", value=parameters.LEAGUE_FILTER)
-            max_clans = st.slider("Maximum Clans to Search Per Run", 10, 500, 100, 10, 
-                               help="Limit the number of clans to search for faster results")
-        
-        with col2:
-            st.subheader("Player Filter Parameters")
-            min_townhall = st.number_input("Minimum Town Hall Level", min_value=1, max_value=16, value=parameters.MIN_TOWNHALL)
-            min_attack_wins = st.number_input("Minimum Attack Wins", min_value=0, max_value=1000, value=parameters.MIN_ATTACK_WINS)
-            min_war_stars = st.number_input("Minimum War Stars", min_value=0, max_value=10000, value=parameters.MIN_WAR_STARS)
-            min_trophies = st.number_input("Minimum Trophies", min_value=0, max_value=10000, value=parameters.MIN_TROPHIES)
+            # Player criteria
+            min_townhall = st.slider("Minimum Town Hall Level", min_value=1, max_value=16, value=16)
+            min_attack_wins = st.slider("Minimum Attack Wins", min_value=0, max_value=5000, value=40)
+            min_war_stars = st.slider("Minimum War Stars", min_value=0, max_value=5000, value=500)
+            min_trophies = st.slider("Minimum Trophies", min_value=0, max_value=8000, value=4500)
             
-            # Convert the excluded roles list to a comma-separated string for input
-            default_excluded = ", ".join(parameters.EXCLUDE_ROLES)
-            exclude_roles_input = st.text_input("Exclude Roles (comma-separated)", value=default_excluded)
-            exclude_roles = [role.strip() for role in exclude_roles_input.split(",") if role.strip()]
+        with col2:
+            # Clan criteria
+            language_filter = st.selectbox(
+                "Clan Language", 
+                options=[
+                    ("English", "en"), 
+                    ("French", "fr"), 
+                    ("German", "de"), 
+                    ("Italian", "it"), 
+                    ("Spanish", "es"), 
+                    ("Russian", "ru"), 
+                    ("Any Language", None)
+                ],
+                format_func=lambda x: x[0],
+                index=0
+            )
+            
+            league_filter = st.selectbox(
+                "Clan War League", 
+                options=[
+                    "Champion", 
+                    "Master", 
+                    "Crystal", 
+                    "Gold", 
+                    "Silver", 
+                    "Bronze", 
+                    None
+                ],
+                index=2
+            )
+            
+            clan_size_min, clan_size_max = st.slider(
+                "Clan Size (members)", 
+                min_value=1, 
+                max_value=50,
+                value=(10, 50)
+            )
+            
+            max_clans = st.slider(
+                "Maximum Clans to Search", 
+                min_value=10, 
+                max_value=1000, 
+                value=100
+            )
+            
+            exclude_roles = st.multiselect(
+                "Exclude Roles", 
+                options=["leader", "coLeader", "admin", "member"],
+                default=["leader"]
+            )
+
+        submitted = st.form_submit_button("Search")
     
-    with about_tab:
-        st.markdown("""
-        ### How It Works
-        
-        This tool searches for active Clash of Clans players by:
-        
-        1. Finding clans that match your filter criteria
-        2. Examining each clan's members for active players
-        3. Filtering players based on your requirements
-        
-        ### Tips for Finding Players
-        
-        - Set Town Hall to 16 for the most competitive players
-        - Higher war stars (500+) indicate experienced players
-        - Look for players with 40+ attack wins per season
-        - Crystal league clans often have more active players
-        
-        ### Continuing Searches
-        
-        After completing a search, you can click "Continue Search" to find more players.
-        The app will remember which clans it has already checked and will only search new ones.
-        """)
-    
-    # Create button row with conditional continue button
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if len(st.session_state.found_players) > 0:
-            # Show stats about previous searches
-            st.info(f"Previously found: {len(st.session_state.found_players)} players from {st.session_state.clans_searched} clans")
-            new_search_button = st.button("Start New Search", type="primary", use_container_width=True)
-        else:
-            new_search_button = st.button("Search for Players", type="primary", use_container_width=True)
-    
-    with col2:
-        # Only show continue button if we've already done a search
-        if len(st.session_state.found_players) > 0:
-            continue_search = st.button("Continue Search", type="secondary", use_container_width=True)
-        else:
-            continue_search = False
-    
-    # Start a new search (reset state)
-    if new_search_button:
-        # Reset session state
-        st.session_state.seen_clan_tags = set()
-        st.session_state.found_players = []
+    if submitted:
+        # Create the progress bars and counters
+        progress_placeholder = st.empty()
+        with progress_placeholder.container():
+            clans_progress = st.progress(0)
+            clans_text = st.empty()
+            current_clan = st.empty()
+            player_progress = st.progress(0)
+            player_text = st.empty()
+
+        # Reset session state for results
         st.session_state.clans_searched = 0
-        continue_search = True  # Trigger the search flow
+        st.session_state.players_found = []
         
-        # Store current search filters
-        st.session_state.search_filters = {
-            "min_members": min_members,
-            "max_members": max_members,
-            "language_filter": language_filter,
-            "league_filter": league_filter,
-            "max_clans": max_clans,
-            "min_townhall": min_townhall,
-            "min_attack_wins": min_attack_wins,
-            "min_war_stars": min_war_stars,
-            "min_trophies": min_trophies,
-            "exclude_roles": exclude_roles
-        }
-    
-    # If continuing search, use the stored filters
-    if continue_search:
-        # Set up progress tracking
-        progress_bar = st.progress(0)
-        status_container = st.container()
-        results_container = st.container()
+        # Extract language code from tuple if needed
+        language_code = language_filter[1] if isinstance(language_filter, tuple) else language_filter
+
+        # Define the progress callback
+        def progress_callback(event_type, data):
+            if event_type == "clan_found":
+                st.session_state.clans_searched += 1
+                clans_text.write(f"Clans searched: {st.session_state.clans_searched}")
+                clans_progress.progress(min(st.session_state.clans_searched / max_clans, 1.0))
+            elif event_type == "clan_processing":
+                current_clan.write(f"Checking clan: {data['name']} ({data['tag']})")
+            elif event_type == "player_found":
+                st.session_state.players_found.append(data)
+                player_text.write(f"Players found: {len(st.session_state.players_found)}")
+                # Assuming we target around 100 players max for a reasonable search
+                player_progress.progress(min(len(st.session_state.players_found) / 100, 1.0))
         
-        # Use stored filters if continuing a search
-        if len(st.session_state.found_players) > 0 and not new_search_button:
-            filters = st.session_state.search_filters
-            min_members = filters["min_members"]
-            max_members = filters["max_members"]
-            language_filter = filters["language_filter"]
-            league_filter = filters["league_filter"]
-            max_clans = filters["max_clans"]
-            min_townhall = filters["min_townhall"]
-            min_attack_wins = filters["min_attack_wins"]
-            min_war_stars = filters["min_war_stars"]
-            min_trophies = filters["min_trophies"]
-            exclude_roles = filters["exclude_roles"]
+        # Run the search with all the parameters from the form
+        with st.spinner("Searching for active players..."):
+            players = search_players_optimized(
+                min_townhall=min_townhall,
+                min_attack_wins=min_attack_wins,
+                min_war_stars=min_war_stars,
+                min_trophies=min_trophies,
+                language_filter=language_code,
+                league_filter=league_filter,
+                exclude_roles=exclude_roles,
+                min_members=clan_size_min,
+                max_members=clan_size_max,
+                max_clans=max_clans,
+                progress_callback=progress_callback
+            )
+            
+        # Clear progress display
+        progress_placeholder.empty()
         
-        # Track local results for this search run
-        found_clans = []
-        newly_found_players = []
+        # Store results in session state
+        st.session_state.search_results = players
         
-        # Status indicators
-        clan_count = status_container.empty()
-        player_count = status_container.empty()
-        current_action = status_container.empty()
-        
-        current_action.info("Starting search...")
-        clan_count.metric("Clans Found", len(found_clans))
-        player_count.metric("Players Found", len(st.session_state.found_players))
-        
-        # Define callback for progress updates
-        def progress_callback(progress_type, data):
-            if progress_type == "clan_found":
-                found_clans.append(data)
-                clan_count.metric("Clans Found", f"{len(found_clans)} (this run) / {st.session_state.clans_searched + len(found_clans)} (total)")
-                progress_bar.progress(min(len(found_clans) / max_clans, 0.95) if max_clans else 0.5)
-                current_action.info(f"Searching clan: {data.get('name', 'Unknown')}") 
-            elif progress_type == "player_found":
-                newly_found_players.append(data)
-                st.session_state.found_players.append(data)
-                player_count.metric("Players Found", f"{len(newly_found_players)} (this run) / {len(st.session_state.found_players)} (total)")
-                current_action.success(f"Found player: {data.get('name', 'Unknown')}")
-        
-        # Call the optimized search function (uses the API key from parameters)
-        current_action.info("Searching for clans and players...")
-        
-        # Pass the existing seen_clan_tags set to avoid duplicates
-        new_players = search_players_optimized(
-            min_townhall=min_townhall,
-            min_attack_wins=min_attack_wins,
-            min_war_stars=min_war_stars,
-            min_trophies=min_trophies,
-            language_filter=language_filter,
-            league_filter=league_filter,
-            exclude_roles=exclude_roles,
-            min_members=min_members,
-            max_members=max_members,
-            max_clans=max_clans,
-            seen_clan_tags=st.session_state.seen_clan_tags,  # Pass existing seen tags
-            progress_callback=progress_callback
-        )
-        
-        # Update session state
-        st.session_state.clans_searched += len(found_clans)
-        
-        progress_bar.progress(100)
-        current_action.success(f"Search complete! Found {len(newly_found_players)} new players in this run.")
+        # Show results summary
+        st.success(f"Search complete! Found {len(players)} active players.")
         
         # Display results
-        with results_container:
-            if newly_found_players:
-                st.subheader("Newly Found Players")
-                
-                # Convert to Polars DataFrame for better display
-                player_data = []
-                for player in newly_found_players:
-                    player_data.append({
-                        "Name": player.get("name", "Unknown"),
-                        "Tag": player.get("tag", "Unknown"),
-                        "Town Hall": player.get("townHallLevel", 0),
-                        "Trophies": player.get("trophies", 0),
-                        "War Stars": player.get("warStars", 0),
-                        "Attack Wins": player.get("attackWins", 0),
-                        "Clan": player.get("clan", {}).get("name", "No Clan")
-                    })
-                
-                new_df = pl.DataFrame(player_data)
-                st.dataframe(new_df, use_container_width=True)
-                
-            if st.session_state.found_players:
-                st.subheader("All Found Players")
-                
-                # Convert to Polars DataFrame for all players
-                all_player_data = []
-                for player in st.session_state.found_players:
-                    all_player_data.append({
-                        "Name": player.get("name", "Unknown"),
-                        "Tag": player.get("tag", "Unknown"),
-                        "Town Hall": player.get("townHallLevel", 0),
-                        "Trophies": player.get("trophies", 0),
-                        "War Stars": player.get("warStars", 0),
-                        "Attack Wins": player.get("attackWins", 0),
-                        "Clan": player.get("clan", {}).get("name", "No Clan")
-                    })
-                
-                all_df = pl.DataFrame(all_player_data)
-                
-                # Export options
-                export_col1, export_col2, export_col3 = st.columns(3)
-                
-                with export_col1:
-                    # Export as CSV
-                    csv_data = all_df.write_csv().encode('utf-8')
-                    st.download_button(
-                        label="Export as CSV",
-                        data=csv_data,
-                        file_name="clash_players.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                
-                with export_col2:
-                    # Export as JSON
-                    json_data = json.dumps(st.session_state.found_players, indent=2).encode('utf-8')
-                    st.download_button(
-                        label="Export as JSON",
-                        data=json_data,
-                        file_name="clash_players.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
-                
-                with export_col3:
-                    # Export just the player tags without #, one per line
-                    tags_only = [tag.replace('#', '') for tag in all_df.get_column("Tag").to_list()]
-                    tags_text = '\n'.join(tags_only)
-                    
-                    st.download_button(
-                        label="Export Player Tags Only",
-                        data=tags_text.encode('utf-8'),
-                        file_name="player_tags.txt",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
-                
-                # Show dataframe with all players
-                st.dataframe(all_df, use_container_width=True)
-            else:
-                st.error("No active players found matching your criteria. Try adjusting your filters.")
+        display_player_results(players)
+    
+    # Show previous results if available
+    elif "search_results" in st.session_state and st.session_state.search_results:
+        st.info(f"Showing previous search results ({len(st.session_state.search_results)} players).")
+        display_player_results(st.session_state.search_results)
 
-if __name__ == "__main__":
-    run()
+def display_player_results(players):
+    """Display the player results in a structured table."""
+    if not players:
+        st.warning("No players found. Try adjusting your search parameters.")
+        return
+    
+    # Convert player data to DataFrame for display
+    player_data = []
+    for player in players:
+        player_data.append({
+            "Name": player.get("name", "Unknown"),
+            "Tag": player.get("tag", "Unknown"),
+            "Town Hall": player.get("townHallLevel", 0),
+            "Trophies": player.get("trophies", 0),
+            "War Stars": player.get("warStars", 0),
+            "Attack Wins": player.get("attackWins", 0),
+            "Clan": player.get("clan", {}).get("name", "No Clan")
+        })
+    
+    df = pl.DataFrame(player_data)
+    
+    # Display the DataFrame in Streamlit
+    st.dataframe(df, use_container_width=True)
+    
+    # Export options
+    export_col1, export_col2, export_col3 = st.columns(3)
+    
+    with export_col1:
+        # Export as CSV
+        csv_data = df.write_csv().encode('utf-8')
+        st.download_button(
+            label="Export as CSV",
+            data=csv_data,
+            file_name="clash_players.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    with export_col2:
+        # Export as JSON
+        json_data = json.dumps(players, indent=2).encode('utf-8')
+        st.download_button(
+            label="Export as JSON",
+            data=json_data,
+            file_name="clash_players.json",
+            mime="application/json",
+            use_container_width=True
+        )
+    
+    with export_col3:
+        # Export just the player tags without #, one per line
+        tags_only = [tag.replace('#', '') for tag in df.get_column("Tag").to_list()]
+        tags_text = '\n'.join(tags_only)
+        
+        st.download_button(
+            label="Export Player Tags Only",
+            data=tags_text.encode('utf-8'),
+            file_name="player_tags.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
